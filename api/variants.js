@@ -14,16 +14,17 @@ async function getCollection() {
 
 // Default seed data — inserted once on first GET if collection is empty
 const DEFAULT_VARIANTS = [
+  // Real Meta results as of Nov 1, 2026 (CPL $8.58). Clicks not yet pulled from Ads Manager.
   {
     id: 'ad-1',
-    name: '24/7 Answering - Small Biz Focus',
+    name: 'AI Receptionist - Sacramento Contractors',
     platform: 'Meta',
-    status: 'Active',
+    status: 'Paused',
     headline: 'Never Miss a Business Lead Again',
     primaryText: 'Sac AI Receptionist answers all your incoming customer calls 24/7, schedules appointments directly to your CRM, and routes urgent calls. Try it risk-free today!',
     cta: 'Book Demo',
-    targetAudience: 'Small Business Owners, Trades & Dental Clinics',
-    budget: 450, impressions: 14200, clicks: 680, leads: 48, spend: 420.50, customerValue: 299,
+    targetAudience: 'Contractors in Sacramento',
+    budget: 34.31, impressions: 344, clicks: 0, leads: 4, spend: 34.31, customerValue: 299,
   },
   {
     id: 'ad-2',
