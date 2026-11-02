@@ -1,473 +1,636 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sac AI Receptionist - Ad Testing Dashboard</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- React & React DOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- Babel Compiler for JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sac AI Receptionist - Ad Testing Dashboard</title>
 
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    }
-  </style>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- React & React DOM -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+<!-- Babel Compiler for JSX -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+.spinner {
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: #06b6d4;
+  border-radius: 50%;
+  width: 14px; height: 14px;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
-  <div id="root"></div>
+<div id="root"></div>
 
-  <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+<script type="text/babel">
+const { useState, useMemo, useEffect, useCallback } = React;
 
-    // Default Ad Variants tailored for Sac AI Receptionist
-    const initialVariants = [
-      {
-        id: 'ad-1',
-        name: '24/7 Answering - Small Biz Focus',
-        platform: 'Meta',
-        status: 'Active',
-        headline: 'Never Miss a Business Lead Again',
-        primaryText: 'Sac AI Receptionist answers all your incoming customer calls 24/7, schedules appointments directly to your CRM, and routes urgent calls. Try it risk-free today!',
-        cta: 'Book Demo',
-        targetAudience: 'Small Business Owners, Trades & Dental Clinics',
-        budget: 450,
-        impressions: 14200,
-        clicks: 680,
-        leads: 48,
-        spend: 420.50,
-        customerValue: 299,
-      },
-      {
-        id: 'ad-2',
-        name: 'Cost Saver vs Human Receptionist',
-        platform: 'Google',
-        status: 'Active',
-        headline: 'Cut Front Desk Costs by 80% with AI',
-        primaryText: 'Why pay $3,500/mo for a front-desk receptionist when Sac AI handles instant phone responses, FAQs, and instant booking at a fraction of the cost?',
-        cta: 'Calculate Savings',
-        targetAudience: 'Law Firms, Medical Practices & Real Estate',
-        budget: 600,
-        impressions: 18900,
-        clicks: 915,
-        leads: 72,
-        spend: 580.00,
-        customerValue: 299,
-      },
-      {
-        id: 'ad-3',
-        name: 'After-Hours Emergency Answering',
-        platform: 'TikTok',
-        status: 'Paused',
-        headline: 'Capture Every Midnight Customer Call',
-        primaryText: 'Over 40% of high-intent callers go to voicemail after hours. Sac AI Receptionist picks up instantly, screens leads, and locks in bookings while you sleep.',
-        cta: 'Start Free Trial',
-        targetAudience: 'Home Services, Plumbers, HVAC & Emergency Repairs',
-        budget: 300,
-        impressions: 9800,
-        clicks: 290,
-        leads: 14,
-        spend: 285.00,
-        customerValue: 299,
-      },
-      {
-        id: 'ad-4',
-        name: 'LinkedIn B2B Enterprise Bot',
-        platform: 'LinkedIn',
-        status: 'Active',
-        headline: 'Autonomous Phone Agents for Modern Teams',
-        primaryText: 'Deploy human-like AI voice receptionists trained on your exact business documentation. Intelligent routing, multi-language support, and seamless Calendar sync.',
-        cta: 'Contact Sales',
-        targetAudience: 'B2B SaaS, Agency Owners & Enterprise Executives',
-        budget: 800,
-        impressions: 11400,
-        clicks: 340,
-        leads: 31,
-        spend: 740.00,
-        customerValue: 499,
+function App() {
+  const [theme, setTheme] = useState('dark');
+  const [variants, setVariants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [platformFilter, setPlatformFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  // New Ad Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '', platform: 'Meta', headline: '', primaryText: '',
+    cta: 'Book Demo', targetAudience: '',
+    budget: 300, impressions: 5000, clicks: 200, leads: 12, spend: 180, customerValue: 299
+  });
+
+  // AI Copy Generator State
+  const [aiPrompt, setAiPrompt] = useState('HVAC and Home Service contractors losing calls on job sites');
+  const [aiTone, setAiTone] = useState('High Urgency & Cost Savings');
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [aiGeneratedResults, setAiGeneratedResults] = useState(null);
+  const [aiError, setAiError] = useState(null);
+
+  // LTV / ROAS Inputs
+  const [monthlyPrice, setMonthlyPrice] = useState(299);
+  const [avgRetentionMonths, setAvgRetentionMonths] = useState(8);
+
+  // ── Load variants from MongoDB via /api/variants ──────────────────────────
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/variants');
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        const data = await res.json();
+        setVariants(data);
+        if (data.length > 0) setSelectedVariantId(data[0].id);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
       }
-    ];
+    }
+    load();
+  }, []);
 
-    function App() {
-      const [theme, setTheme] = useState('dark');
-      const [variants, setVariants] = useState(initialVariants);
-      const [selectedVariantId, setSelectedVariantId] = useState(initialVariants[0].id);
-      const [platformFilter, setPlatformFilter] = useState('All');
-      const [statusFilter, setStatusFilter] = useState('All');
+  useEffect(() => {
+    if (window.lucide) window.lucide.createIcons();
+  });
 
-      // New Ad Modal State
-      const [isModalOpen, setIsModalOpen] = useState(false);
-      const [formData, setFormData] = useState({
-        name: '',
-        platform: 'Meta',
-        headline: '',
-        primaryText: '',
-        cta: 'Book Demo',
-        targetAudience: '',
-        budget: 300,
-        impressions: 5000,
-        clicks: 200,
-        leads: 12,
-        spend: 180,
-        customerValue: 299
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  const calculateMetrics = (v) => {
+    const ctr = v.impressions > 0 ? ((v.clicks / v.impressions) * 100).toFixed(2) : 0;
+    const cpc = v.clicks > 0 ? (v.spend / v.clicks).toFixed(2) : 0;
+    const cpl = v.leads > 0 ? (v.spend / v.leads).toFixed(2) : 0;
+    const convRate = v.clicks > 0 ? ((v.leads / v.clicks) * 100).toFixed(2) : 0;
+    const estimatedLTV = monthlyPrice * avgRetentionMonths;
+    const totalRevenue = v.leads * estimatedLTV;
+    const roas = v.spend > 0 ? (totalRevenue / v.spend).toFixed(2) : 0;
+    return { ctr, cpc, cpl, convRate, roas, totalRevenue };
+  };
+
+  const activeVariant = variants.find(v => v.id === selectedVariantId) || variants[0];
+
+  const filteredVariants = variants.filter(v => {
+    const matchPlatform = platformFilter === 'All' || v.platform === platformFilter;
+    const matchStatus = statusFilter === 'All' || v.status === statusFilter;
+    return matchPlatform && matchStatus;
+  });
+
+  const totalSpend = variants.reduce((acc, v) => acc + v.spend, 0);
+  const totalLeads = variants.reduce((acc, v) => acc + v.leads, 0);
+  const totalClicks = variants.reduce((acc, v) => acc + v.clicks, 0);
+  const totalImpressions = variants.reduce((acc, v) => acc + v.impressions, 0);
+  const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 0;
+  const overallCpl = totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : 0;
+
+  // ── Create new variant → POST to /api/variants ────────────────────────────
+  const handleCreateVariant = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    const newVariant = {
+      ...formData,
+      id: `ad-${Date.now()}`,
+      status: 'Active',
+      impressions: Number(formData.impressions),
+      clicks: Number(formData.clicks),
+      leads: Number(formData.leads),
+      spend: Number(formData.spend),
+      budget: Number(formData.budget),
+    };
+    try {
+      const res = await fetch('/api/variants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVariant)
       });
+      if (!res.ok) throw new Error('Save failed');
+      setVariants([newVariant, ...variants]);
+      setSelectedVariantId(newVariant.id);
+      setIsModalOpen(false);
+    } catch (err) {
+      alert('Could not save variant: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      // AI Copy Generator State
-      const [aiPrompt, setAiPrompt] = useState('Targeting HVAC and Home Service contractors losing leads');
-      const [aiTone, setAiTone] = useState('High Urgency & Cost Savings');
-      const [isAiGenerating, setIsAiGenerating] = useState(false);
-      const [aiGeneratedResults, setAiGeneratedResults] = useState(null);
+  // ── Toggle Active/Paused → PUT /api/variants ─────────────────────────────
+  const toggleStatus = async (id) => {
+    const v = variants.find(v => v.id === id);
+    if (!v) return;
+    const newStatus = v.status === 'Active' ? 'Paused' : 'Active';
+    setVariants(variants.map(v => v.id === id ? { ...v, status: newStatus } : v));
+    await fetch('/api/variants', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status: newStatus })
+    });
+  };
 
-      // LTV / ROAS Inputs
-      const [monthlyPrice, setMonthlyPrice] = useState(299);
-      const [avgRetentionMonths, setAvgRetentionMonths] = useState(8);
+  // ── Delete variant → DELETE /api/variants ────────────────────────────────
+  const deleteVariant = async (id) => {
+    const updated = variants.filter(v => v.id !== id);
+    setVariants(updated);
+    if (selectedVariantId === id && updated.length > 0) setSelectedVariantId(updated[0].id);
+    await fetch('/api/variants', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+  };
 
-      useEffect(() => {
-        if (window.lucide) {
-          window.lucide.createIcons();
-        }
+  // ── Update single metric inline → PUT /api/variants ──────────────────────
+  const updateVariantField = async (id, field, value) => {
+    setVariants(variants.map(v => v.id === id ? { ...v, [field]: value } : v));
+    await fetch('/api/variants', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, [field]: value })
+    });
+  };
+
+  // ── AI Copy Generator → POST /api/generate ───────────────────────────────
+  const generateAICopy = async () => {
+    setIsAiGenerating(true);
+    setAiGeneratedResults(null);
+    setAiError(null);
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt, tone: aiTone })
       });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+      const data = await res.json();
+      setAiGeneratedResults(data);
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
-      const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  const applyAiVariantToForm = (item) => {
+    setFormData({
+      ...formData,
+      name: item.name,
+      platform: item.platform || 'Meta',
+      headline: item.headline,
+      primaryText: item.primaryText,
+      cta: item.cta,
+      targetAudience: item.targetAudience
+    });
+    setIsModalOpen(true);
+  };
 
-      const calculateMetrics = (v) => {
-        const ctr = v.impressions > 0 ? ((v.clicks / v.impressions) * 100).toFixed(2) : 0;
-        const cpc = v.clicks > 0 ? (v.spend / v.clicks).toFixed(2) : 0;
-        const cpl = v.leads > 0 ? (v.spend / v.leads).toFixed(2) : 0;
-        const convRate = v.clicks > 0 ? ((v.leads / v.clicks) * 100).toFixed(2) : 0;
-        const estimatedLTV = monthlyPrice * avgRetentionMonths;
-        const totalRevenue = v.leads * estimatedLTV;
-        const roas = v.spend > 0 ? (totalRevenue / v.spend).toFixed(2) : 0;
+  const isDark = theme === 'dark';
+  const card = `p-5 rounded-2xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`;
 
-        return { ctr, cpc, cpl, convRate, roas, totalRevenue };
-      };
+  // ── Loading / Error screens ───────────────────────────────────────────────
+  if (loading) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="spinner mx-auto" style={{width:32,height:32,borderWidth:3}}></div>
+        <p className="text-slate-400 text-sm">Loading ad variants…</p>
+      </div>
+    </div>
+  );
 
-      const activeVariant = variants.find(v => v.id === selectedVariantId) || variants[0];
+  if (error) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-8">
+      <div className="text-center space-y-3 max-w-md">
+        <div className="text-rose-400 text-lg font-bold">⚠ Failed to load</div>
+        <p className="text-slate-400 text-sm">{error}</p>
+        <button onClick={() => location.reload()} className="mt-4 px-4 py-2 bg-cyan-500 text-white rounded-lg text-sm">
+          Retry
+        </button>
+      </div>
+    </div>
+  );
 
-      const filteredVariants = variants.filter(v => {
-        const matchPlatform = platformFilter === 'All' || v.platform === platformFilter;
-        const matchStatus = statusFilter === 'All' || v.status === statusFilter;
-        return matchPlatform && matchStatus;
-      });
+  return (
+    <div className={`min-h-screen transition-colors ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
 
-      const totalSpend = variants.reduce((acc, v) => acc + v.spend, 0);
-      const totalLeads = variants.reduce((acc, v) => acc + v.leads, 0);
-      const totalClicks = variants.reduce((acc, v) => acc + v.clicks, 0);
-      const totalImpressions = variants.reduce((acc, v) => acc + v.impressions, 0);
-      const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 0;
-      const overallCpl = totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : 0;
-
-      const handleCreateVariant = (e) => {
-        e.preventDefault();
-        const newVariant = {
-          ...formData,
-          id: `ad-${Date.now()}`,
-          status: 'Active',
-          impressions: Number(formData.impressions),
-          clicks: Number(formData.clicks),
-          leads: Number(formData.leads),
-          spend: Number(formData.spend),
-          budget: Number(formData.budget),
-        };
-        setVariants([newVariant, ...variants]);
-        setSelectedVariantId(newVariant.id);
-        setIsModalOpen(false);
-      };
-
-      const toggleStatus = (id) => {
-        setVariants(variants.map(v => v.id === id ? { ...v, status: v.status === 'Active' ? 'Paused' : 'Active' } : v));
-      };
-
-      const deleteVariant = (id) => {
-        const updated = variants.filter(v => v.id !== id);
-        setVariants(updated);
-        if (selectedVariantId === id && updated.length > 0) setSelectedVariantId(updated[0].id);
-      };
-
-      const generateAICopy = async () => {
-        setIsAiGenerating(true);
-        setAiGeneratedResults(null);
-
-        const promptText = `Generate 2 ad variants for Sac AI Receptionist (sacaireceptionist.com). Target: ${aiPrompt}. Tone: ${aiTone}. Return JSON array with keys: name, platform, headline, primaryText, cta, targetAudience.`;
-
-        try {
-          const apiKey = ""; // Will use default API runtime
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: promptText }] }],
-              generationConfig: { responseMimeType: "application/json" }
-            })
-          });
-          const data = await res.json();
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            setAiGeneratedResults(JSON.parse(rawText));
-          } else throw new Error();
-        } catch (err) {
-          setAiGeneratedResults([
-            {
-              name: "24/7 AI Phone Answering - AI Lead Rescue",
-              platform: "Meta",
-              headline: "Stop Letting Phone Calls Go to Voicemail",
-              primaryText: "Every missed call is a missed customer. Sac AI Receptionist picks up in 1 ring, qualifies the caller, and books them right on your schedule 24/7.",
-              cta: "Book Demo",
-              targetAudience: "Contractors, Legal & Service Businesses"
-            },
-            {
-              name: "Front Desk Cost Reducer 2026",
-              platform: "Google",
-              headline: "Replace $40k/yr Front Desk Costs with AI",
-              primaryText: "Get an instant AI phone receptionist trained on your business. Handles call spikes, after-hours inquiries, and appointment booking with zero human delay.",
-              cta: "Start Free Trial",
-              targetAudience: "Local Service SMBs (5-50 Employees)"
-            }
-          ]);
-        } finally {
-          setIsAiGenerating(false);
-        }
-      };
-
-      const applyAiVariantToForm = (item) => {
-        setFormData({
-          ...formData,
-          name: item.name,
-          platform: item.platform || 'Meta',
-          headline: item.headline,
-          primaryText: item.primaryText,
-          cta: item.cta,
-          targetAudience: item.targetAudience
-        });
-        setIsModalOpen(true);
-      };
-
-      return (
-        <div className={`min-h-screen transition-colors ${theme === 'dark' ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
-          {/* Header */}
-          <header className={`border-b sticky top-0 z-30 backdrop-blur-md ${theme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200'}`}>
-            <div className="max-w-7xl mx-auto px-4 py-3.5 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="bg-gradient-to-tr from-cyan-500 to-blue-600 p-2.5 rounded-xl text-white">
-                  <i data-lucide="bot" className="w-6 h-6"></i>
-                </div>
-                <div>
-                  <h1 className="font-bold text-lg">Sac AI Receptionist</h1>
-                  <p className="text-xs text-slate-400">Ad Lab & Performance Dashboard (sacaireceptionist.com)</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md">
-                  + Create Ad Variant
-                </button>
-                <button onClick={toggleTheme} className={`p-2 rounded-lg border ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-100 border-slate-300 text-slate-600'}`}>
-                  <i data-lucide={theme === 'dark' ? "sun" : "moon"} className="w-4 h-4"></i>
-                </button>
-              </div>
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <header className={`border-b sticky top-0 z-30 backdrop-blur-md ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200'}`}>
+        <div className="max-w-7xl mx-auto px-4 py-3.5 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-gradient-to-tr from-cyan-500 to-blue-600 p-2.5 rounded-xl text-white">
+              <i data-lucide="bot" className="w-6 h-6"></i>
             </div>
-          </header>
+            <div>
+              <h1 className="font-bold text-lg">Sac AI Receptionist</h1>
+              <p className="text-xs text-slate-400">Ad Lab & Performance Dashboard (sacaireceptionist.com)</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md"
+            >
+              + Create Ad Variant
+            </button>
+            <button
+              onClick={toggleTheme}
+              className={`p-2 rounded-lg border ${isDark ? 'bg-slate-800 border-slate-700 text-amber-400' : 'bg-slate-100 border-slate-300 text-slate-600'}`}
+            >
+              <i data-lucide={isDark ? "sun" : "moon"} className="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </header>
 
-          {/* Main Body */}
-          <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-            {/* Top Cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className={`p-5 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-xs text-slate-400 uppercase">Total Ad Spend</div>
-                <div className="text-2xl font-bold font-mono mt-1">${totalSpend.toFixed(2)}</div>
-                <div className="text-xs text-emerald-400 mt-2">{variants.length} active variants</div>
-              </div>
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
 
-              <div className={`p-5 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-xs text-slate-400 uppercase">Qualified Leads</div>
-                <div className="text-2xl font-bold font-mono mt-1">{totalLeads}</div>
-                <div className="text-xs text-cyan-400 mt-2">Demos & Free Trial Conversions</div>
-              </div>
+        {/* ── Top Summary Cards ───────────────────────────────────────────── */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={card}>
+            <div className="text-xs text-slate-400 uppercase tracking-wide">TOTAL AD SPEND</div>
+            <div className="text-2xl font-bold font-mono mt-1">${totalSpend.toFixed(2)}</div>
+            <div className="text-xs text-emerald-400 mt-2">{variants.length} active variants</div>
+          </div>
+          <div className={card}>
+            <div className="text-xs text-slate-400 uppercase tracking-wide">QUALIFIED LEADS</div>
+            <div className="text-2xl font-bold font-mono mt-1">{totalLeads}</div>
+            <div className="text-xs text-cyan-400 mt-2">Demos & Free Trial Conversions</div>
+          </div>
+          <div className={card}>
+            <div className="text-xs text-slate-400 uppercase tracking-wide">AVG COST PER LEAD (CPL)</div>
+            <div className="text-2xl font-bold font-mono mt-1">${overallCpl}</div>
+            <div className="text-xs text-emerald-400 mt-2">Target CPL: $25.00</div>
+          </div>
+          <div className={card}>
+            <div className="text-xs text-slate-400 uppercase tracking-wide">IMPRESSIONS & CTR</div>
+            <div className="text-2xl font-bold font-mono mt-1">{(totalImpressions / 1000).toFixed(1)}k</div>
+            <div className="text-xs text-purple-400 mt-2">Avg CTR: {avgCtr}%</div>
+          </div>
+        </section>
 
-              <div className={`p-5 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-xs text-slate-400 uppercase">Avg Cost Per Lead (CPL)</div>
-                <div className="text-2xl font-bold font-mono mt-1">${overallCpl}</div>
-                <div className="text-xs text-emerald-400 mt-2">Target CPL: $25.00</div>
-              </div>
+        {/* ── Ad Variants + Live Mockup ────────────────────────────────────── */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-              <div className={`p-5 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-xs text-slate-400 uppercase">Impressions & CTR</div>
-                <div className="text-2xl font-bold font-mono mt-1">{(totalImpressions / 1000).toFixed(1)}k</div>
-                <div className="text-xs text-purple-400 mt-2">Avg CTR: {avgCtr}%</div>
-              </div>
-            </section>
-
-            {/* Ad Variants Grid & Preview */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left Column: List */}
-              <div className="lg:col-span-7 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="font-bold text-lg">Ad Variants & Experiments</h2>
-                  <div className="flex space-x-2">
-                    <select value={platformFilter} onChange={e => setPlatformFilter(e.target.value)} className={`text-xs p-2 rounded border ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}>
-                      <option value="All">All Platforms</option>
-                      <option value="Meta">Meta</option>
-                      <option value="Google">Google</option>
-                      <option value="TikTok">TikTok</option>
-                      <option value="LinkedIn">LinkedIn</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {filteredVariants.map(variant => {
-                    const m = calculateMetrics(variant);
-                    const isSelected = variant.id === selectedVariantId;
-                    return (
-                      <div 
-                        key={variant.id} 
-                        onClick={() => setSelectedVariantId(variant.id)}
-                        className={`p-4 rounded-xl border cursor-pointer relative ${isSelected ? 'border-cyan-500 bg-slate-900' : 'border-slate-800 bg-slate-900/40'}`}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 mr-2">{variant.platform}</span>
-                            <span className="font-bold text-sm">{variant.name}</span>
-                          </div>
-                          <div className="flex space-x-2">
-                            <button onClick={(e) => { e.stopPropagation(); toggleStatus(variant.id); }} className="text-xs text-slate-400 hover:text-emerald-400">
-                              {variant.status}
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); deleteVariant(variant.id); }} className="text-xs text-slate-400 hover:text-rose-400">
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-2 pt-2 text-xs border-t border-slate-800/40">
-                          <div><span className="text-slate-500 block">CTR</span><strong className="text-cyan-400">{m.ctr}%</strong></div>
-                          <div><span className="text-slate-500 block">CPL</span><strong className="text-emerald-400">${m.cpl}</strong></div>
-                          <div><span className="text-slate-500 block">Leads</span><strong>{variant.leads}</strong></div>
-                          <div><span className="text-slate-500 block">ROAS</span><strong className="text-purple-400">{m.roas}x</strong></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right Column: Live Mockup Render */}
-              <div className="lg:col-span-5 space-y-4">
-                <h2 className="font-bold text-lg">Live Ad Render Mockup</h2>
-                <div className={`p-5 rounded-2xl border ${theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-cyan-500 flex items-center justify-center font-bold text-slate-950">
-                      AI
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm">Sac AI Receptionist</div>
-                      <div className="text-xs text-slate-400">Sponsored • sacaireceptionist.com</div>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-slate-300 mb-4 leading-relaxed">{activeVariant.primaryText}</p>
-
-                  <div className="rounded-xl bg-gradient-to-br from-slate-900 to-blue-950 p-6 text-center border border-slate-700/60 mb-4">
-                    <div className="text-cyan-400 font-bold text-lg mb-1">"{activeVariant.headline}"</div>
-                    <div className="text-xs text-slate-400">24/7 Autonomous Phone Agent for SMBs</div>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <div>
-                      <div className="text-[10px] text-slate-400">sacaireceptionist.com</div>
-                      <div className="text-xs font-bold">{activeVariant.headline}</div>
-                    </div>
-                    <button className="bg-cyan-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs">
-                      {activeVariant.cta}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* AI Generator Section */}
-            <section className={`p-6 rounded-2xl border space-y-4 ${theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="font-bold text-lg">AI Copywriter & Ad Generator</h2>
-                  <p className="text-xs text-slate-400">Powered by Gemini 3 Flash API</p>
-                </div>
-                <button onClick={generateAICopy} disabled={isAiGenerating} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium px-4 py-2 rounded-xl text-xs">
-                  {isAiGenerating ? 'Generating...' : '✨ Generate Variations'}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input 
-                  type="text" 
-                  value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
-                  placeholder="Target audience & niche focus"
-                  className={`p-2 text-xs rounded border ${theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
-                />
-                <select 
-                  value={aiTone}
-                  onChange={e => setAiTone(e.target.value)}
-                  className={`p-2 text-xs rounded border ${theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+          {/* Variants list */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="font-bold text-lg">Ad Variants & Experiments</h2>
+              <div className="flex space-x-2">
+                <select
+                  value={platformFilter}
+                  onChange={e => setPlatformFilter(e.target.value)}
+                  className={`text-xs p-2 rounded border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
                 >
-                  <option value="High Urgency & Cost Savings">High Urgency & Cost Savings</option>
-                  <option value="After-Hours & Missed Calls Angle">After-Hours & Missed Calls Rescue</option>
-                  <option value="Professional Enterprise Bot">Professional Enterprise Bot</option>
+                  <option value="All">All Platforms</option>
+                  <option value="Meta">Meta</option>
+                  <option value="Google">Google</option>
+                  <option value="TikTok">TikTok</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                </select>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className={`text-xs p-2 rounded border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Paused">Paused</option>
                 </select>
               </div>
+            </div>
 
-              {aiGeneratedResults && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
-                  {aiGeneratedResults.map((item, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-slate-800 bg-slate-950 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded">{item.platform}</span>
-                        <button onClick={() => applyAiVariantToForm(item)} className="text-xs text-cyan-400">Use Variant</button>
+            {filteredVariants.length === 0 && (
+              <div className={`p-8 text-center rounded-xl border border-dashed ${isDark ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+                No variants match this filter.
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {filteredVariants.map(variant => {
+                const m = calculateMetrics(variant);
+                const isSelected = variant.id === selectedVariantId;
+                return (
+                  <div
+                    key={variant.id}
+                    onClick={() => setSelectedVariantId(variant.id)}
+                    className={`p-4 rounded-xl border cursor-pointer relative ${
+                      isSelected
+                        ? 'border-cyan-500 bg-slate-900'
+                        : isDark ? 'border-slate-800 bg-slate-900/40 hover:border-slate-700' : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 mr-2">{variant.platform}</span>
+                        <span className="font-bold text-sm">{variant.name}</span>
                       </div>
-                      <h4 className="font-bold text-sm">{item.headline}</h4>
-                      <p className="text-xs text-slate-300">{item.primaryText}</p>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${variant.status === 'Active' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700/50 text-slate-400'}`}>
+                          {variant.status}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleStatus(variant.id); }}
+                          className="text-xs text-slate-400 hover:text-emerald-400 px-2 py-0.5 rounded hover:bg-slate-800"
+                          title="Toggle Active/Paused"
+                        >
+                          {variant.status === 'Active' ? 'Pause' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteVariant(variant.id); }}
+                          className="text-xs text-slate-400 hover:text-rose-400 px-2 py-0.5 rounded hover:bg-slate-800"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </main>
-
-          {/* Modal */}
-          {isModalOpen && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-lg">Create New Variant</h3>
-                  <button onClick={() => setIsModalOpen(false)}>✕</button>
-                </div>
-                <form onSubmit={handleCreateVariant} className="space-y-3">
-                  <input type="text" placeholder="Campaign Variant Name" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2 text-xs bg-slate-950 border border-slate-800 rounded" />
-                  <input type="text" placeholder="Headline" required value={formData.headline} onChange={e => setFormData({...formData, headline: e.target.value})} className="w-full p-2 text-xs bg-slate-950 border border-slate-800 rounded" />
-                  <textarea placeholder="Primary Ad Text" rows="3" required value={formData.primaryText} onChange={e => setFormData({...formData, primaryText: e.target.value})} className="w-full p-2 text-xs bg-slate-950 border border-slate-800 rounded"></textarea>
-                  <div className="flex justify-end space-x-2">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-3 py-1.5 text-xs text-slate-400">Cancel</button>
-                    <button type="submit" className="px-4 py-1.5 text-xs bg-cyan-500 text-slate-950 font-bold rounded">Save Variant</button>
+                    <p className="text-xs text-slate-400 mb-2 line-clamp-1">"{variant.headline}"</p>
+                    <div className="grid grid-cols-4 gap-2 pt-2 text-xs border-t border-slate-800/40">
+                      <div><span className="text-slate-500 block">CTR</span><strong className="text-cyan-400">{m.ctr}%</strong></div>
+                      <div><span className="text-slate-500 block">CPL</span><strong className="text-emerald-400">${m.cpl}</strong></div>
+                      <div><span className="text-slate-500 block">Leads</span><strong>{variant.leads}</strong></div>
+                      <div><span className="text-slate-500 block">ROAS</span><strong className="text-purple-400">{m.roas}x</strong></div>
+                    </div>
                   </div>
-                </form>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Live Mockup Preview */}
+          <div className="lg:col-span-5 space-y-4">
+            <h2 className="font-bold text-lg">Live Ad Render Mockup</h2>
+            {activeVariant && (
+              <div className={`p-5 rounded-2xl border space-y-4 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-full bg-cyan-500 flex items-center justify-center font-bold text-slate-950 text-xs">
+                    SAC
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm">Sac AI Receptionist</div>
+                    <div className="text-xs text-slate-400">Sponsored • sacaireceptionist.com</div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">{activeVariant.primaryText}</p>
+
+                <div className="rounded-xl bg-gradient-to-br from-slate-900 to-blue-950 p-6 text-center border border-slate-700/60">
+                  <div className="text-cyan-400 font-bold text-base mb-1">"{activeVariant.headline}"</div>
+                  <div className="text-xs text-slate-400">24/7 Autonomous Phone Agent for SMBs</div>
+                </div>
+
+                <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
+                  <div>
+                    <div className="text-[10px] text-slate-400">sacaireceptionist.com</div>
+                    <div className="text-xs font-bold truncate max-w-[180px]">{activeVariant.headline}</div>
+                  </div>
+                  <button className="bg-cyan-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs">
+                    {activeVariant.cta}
+                  </button>
+                </div>
+
+                {/* Inline metric editor — changes persist to MongoDB */}
+                <div className="pt-3 border-t border-slate-800 space-y-2">
+                  <p className="text-xs text-slate-400 font-medium">Edit real numbers (auto-saves)</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[['clicks','Clicks'],['leads','Leads'],['spend','Spend $']].map(([field, label]) => (
+                      <div key={field}>
+                        <label className="text-[10px] text-slate-500 block mb-0.5">{label}</label>
+                        <input
+                          type="number"
+                          value={activeVariant[field]}
+                          onChange={e => updateVariantField(activeVariant.id, field, Number(e.target.value))}
+                          className={`w-full text-xs p-1.5 rounded border ${isDark ? 'bg-slate-950 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── ROAS Engine ──────────────────────────────────────────────────── */}
+        <section className={`p-6 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <h2 className="font-bold text-base mb-1">Sac AI ROAS Engine</h2>
+          <p className="text-xs text-slate-400 mb-4">Adjust your pricing to recalculate ROAS across all variants</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Monthly Package Price ($)</label>
+              <input
+                type="number"
+                value={monthlyPrice}
+                onChange={e => setMonthlyPrice(Number(e.target.value))}
+                className={`w-full text-sm p-2 rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300'}`}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">Avg Client Retention (Months)</label>
+              <input
+                type="number"
+                value={avgRetentionMonths}
+                onChange={e => setAvgRetentionMonths(Number(e.target.value))}
+                className={`w-full text-sm p-2 rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-300'}`}
+              />
+            </div>
+            <div className={`p-4 rounded-xl border space-y-1.5 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Client LTV:</span>
+                <span className="font-bold text-cyan-400">${monthlyPrice * avgRetentionMonths}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Est. Pipeline Revenue:</span>
+                <span className="font-bold text-emerald-400">${(totalLeads * monthlyPrice * avgRetentionMonths).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Blended ROAS:</span>
+                <span className="font-bold text-purple-400">
+                  {totalSpend > 0 ? ((totalLeads * monthlyPrice * avgRetentionMonths) / totalSpend).toFixed(1) : '0'}x
+                </span>
               </div>
             </div>
-          )}
-        </div>
-      );
-    }
+          </div>
+        </section>
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-  </script>
+        {/* ── AI Copywriter ─────────────────────────────────────────────────── */}
+        <section className={`p-6 rounded-2xl border space-y-4 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <span>✨</span> AI Copywriter & Ad Generator
+              </h2>
+              <p className="text-xs text-slate-400">Powered by Gemini — server-side via /api/generate</p>
+            </div>
+            <button
+              onClick={generateAICopy}
+              disabled={isAiGenerating}
+              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium px-4 py-2 rounded-xl text-xs flex items-center gap-2 disabled:opacity-50"
+            >
+              {isAiGenerating ? <><span className="spinner"></span> Generating…</> : '✨ Generate Variations'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              placeholder="Target audience & niche focus"
+              className={`p-2.5 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+            />
+            <select
+              value={aiTone}
+              onChange={e => setAiTone(e.target.value)}
+              className={`p-2.5 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+            >
+              <option value="High Urgency & Cost Savings">High Urgency & Cost Savings</option>
+              <option value="After-Hours & Missed Calls Rescue">After-Hours & Missed Calls Rescue</option>
+              <option value="Professional Enterprise Bot">Professional Enterprise Bot</option>
+              <option value="Casual & Friendly Local Business">Casual & Friendly Local Business</option>
+            </select>
+          </div>
+
+          {aiError && (
+            <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
+              ⚠ {aiError}
+            </div>
+          )}
+
+          {aiGeneratedResults && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+              {aiGeneratedResults.map((item, idx) => (
+                <div key={idx} className={`p-4 rounded-xl border space-y-2 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded font-bold">{item.platform}</span>
+                    <button onClick={() => applyAiVariantToForm(item)} className="text-xs text-cyan-400 hover:text-cyan-300 font-medium">
+                      Use Variant →
+                    </button>
+                  </div>
+                  <h4 className="font-bold text-sm">"{item.headline}"</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">{item.primaryText}</p>
+                  <p className="text-[10px] text-slate-500">Target: {item.targetAudience}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+      </main>
+
+      {/* ── Create Variant Modal ──────────────────────────────────────────── */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className={`max-w-lg w-full p-6 rounded-2xl border space-y-4 ${isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'}`}>
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-lg">Create New Variant</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white text-lg">✕</button>
+            </div>
+            <form onSubmit={handleCreateVariant} className="space-y-3">
+              <input
+                type="text" placeholder="Campaign Variant Name" required
+                value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                className={`w-full p-2 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={formData.platform} onChange={e => setFormData({...formData, platform: e.target.value})}
+                  className={`p-2 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+                >
+                  <option>Meta</option><option>Google</option><option>TikTok</option><option>LinkedIn</option>
+                </select>
+                <input
+                  type="text" placeholder="CTA e.g. Book Demo"
+                  value={formData.cta} onChange={e => setFormData({...formData, cta: e.target.value})}
+                  className={`p-2 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+                />
+              </div>
+              <input
+                type="text" placeholder="Headline" required
+                value={formData.headline} onChange={e => setFormData({...formData, headline: e.target.value})}
+                className={`w-full p-2 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+              />
+              <textarea
+                placeholder="Primary ad copy" rows="3" required
+                value={formData.primaryText} onChange={e => setFormData({...formData, primaryText: e.target.value})}
+                className={`w-full p-2 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+              ></textarea>
+              <input
+                type="text" placeholder="Target Audience"
+                value={formData.targetAudience} onChange={e => setFormData({...formData, targetAudience: e.target.value})}
+                className={`w-full p-2 text-xs rounded-lg border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`}
+              />
+              <div className="grid grid-cols-3 gap-2">
+                {[['impressions','Impressions'],['clicks','Clicks'],['leads','Leads']].map(([field,label]) => (
+                  <div key={field}>
+                    <label className="text-[10px] text-slate-400 block mb-1">{label}</label>
+                    <input type="number" value={formData[field]} onChange={e => setFormData({...formData, [field]: e.target.value})}
+                      className={`w-full p-2 text-xs rounded border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`} />
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[['spend','Spend ($)'],['budget','Budget ($)']].map(([field,label]) => (
+                  <div key={field}>
+                    <label className="text-[10px] text-slate-400 block mb-1">{label}</label>
+                    <input type="number" value={formData[field]} onChange={e => setFormData({...formData, [field]: e.target.value})}
+                      className={`w-full p-2 text-xs rounded border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-300'}`} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSaving} className="px-4 py-1.5 text-xs bg-cyan-500 text-slate-950 font-bold rounded-lg disabled:opacity-60 flex items-center gap-2">
+                  {isSaving ? <><span className="spinner"></span> Saving…</> : 'Save Variant'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
 </body>
 </html>
